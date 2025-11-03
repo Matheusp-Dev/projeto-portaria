@@ -1,0 +1,31 @@
+// Definição
+const int led = 13;
+const int ldr = A0;
+
+void setup()
+{
+ 	pinMode(led, OUTPUT);
+  	pinMode(ldr, INPUT);
+}
+
+void loop()
+{
+  	Serial.begin(9600);
+	gerenciarLuzes();
+}
+
+// Gerenciar as luzes a partir da iluminação
+void gerenciarLuzes()
+{
+  
+  int valorLDR = analogRead(ldr);
+  Serial.println(valorLDR);
+  delay(100);
+  
+  
+  if(valorLDR > 900) {
+  	digitalWrite(led, HIGH);
+  } else {
+  	digitalWrite(led, LOW);
+  }
+}
