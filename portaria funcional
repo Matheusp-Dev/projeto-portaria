@@ -1,4 +1,38 @@
+#include <Wire.h>                 
+#include <LiquidCrystal_I2C.h>    
+#include <SPI.h>                  
+#include <MFRC522.h>              
+#include <ESP32Servo.h>
+
 // Definição de variáveis
+
+//Entrada de moradores
+#define I2C_SDA_PIN 25
+#define I2C_SCL_PIN 26
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+#define SS_PIN    5  
+#define RST_PIN   4 
+MFRC522 mfrc522(SS_PIN, RST_PIN); 
+
+#define SERVO_PIN 14 
+#define ANGULO_PORTA_FECHADA 0
+#define ANGULO_PORTA_ABERTA  90
+#define TEMPO_PORTA_ABERTA 4000 
+Servo portaServo;
+bool portaEstaAberta = false;
+
+
+const int NUMERO_MORADORES = 2;
+struct Morador {
+  String uid;
+  String nome;
+};
+
+Morador moradores[NUMERO_MORADORES] = {
+  {"AA BB CC DD", "Kelwin"},
+  {"EE FF 00 11", "Maria"} 
+};
 
 //Pinos para a iluminação da Portaria
 const int led = 15;
@@ -38,12 +72,24 @@ void setup(){
 	pinMode(LedVaga2, OUTPUT);
 	pinMode(LedVaga3, OUTPUT);
 	inicializarLeds();
+
+  	Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+	lcd.init();
+  	lcd.backlight();
+  	mostrarMensagemPadrao();
+
+  	portaServo.attach(SERVO_PIN);
+  	portaServo.write(ANGULO_PORTA_FECHADA); 
+
+  	SPI.begin();          
+  	mfrc522.PCD_Init();  
 }
 
 void loop(){
 	gerenciarLuzes();
   	CercaEletrica();
 	SensorDeVaga();
+	AcessoMoradores();
 }
 
 void gerenciarLuzes(){
@@ -106,6 +152,88 @@ void SensorDeVaga() {
   }
 
   delay(250);
+}
+
+void AcessoMoradores() {
+  if (portaEstaAberta) {
+    return;
+  }
+
+  if ( ! mfrc522.PICC_IsNewCardPresent()) {
+    return;
+  }
+  if ( ! mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
+
+  String uidScaneado = "";
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    uidScaneado.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    uidScaneado.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  uidScaneado.toUpperCase();
+  uidScaneado.trim();
+
+  Serial.print("UID Scaneado: ");
+  Serial.println(uidScaneado);
+
+  String nomeAutorizado = "";
+  bool acessoPermitido = false;
+
+  for (int i = 0; i < NUMERO_MORADORES; i++) {
+    if (uidScaneado == moradores[i].uid) {
+      nomeAutorizado = moradores[i].nome;
+      acessoPermitido = true;
+      break;
+    }
+  }
+
+  if (acessoPermitido) {
+    Serial.print("Acesso Permitido para: ");
+    Serial.println(nomeAutorizado);
+    abrirPorta(nomeAutorizado); 
+  } else {
+    Serial.println("Acesso Negado!");
+    mostrarAcessoNegado();
+  }
+  
+  mfrc522.PICC_HaltA();
+  mfrc522.PCD_StopCrypto1();
+}
+
+void abrirPorta(String nome) {
+  portaEstaAberta = true; 
+
+  lcd.clear();
+  lcd.setCursor(3, 0);
+  lcd.print("Bem vindo!");
+  
+  int padding = (16 - nome.length()) / 2;
+  if (padding < 0) padding = 0;
+  lcd.setCursor(padding, 1);
+  lcd.print(nome);
+
+  portaServo.write(ANGULO_PORTA_ABERTA);
+  delay(TEMPO_PORTA_ABERTA);
+  portaServo.write(ANGULO_PORTA_FECHADA);
+  mostrarMensagemPadrao();
+  portaEstaAberta = false; 
+}
+
+void mostrarAcessoNegado() {
+  lcd.clear();
+  lcd.setCursor(2, 0);
+  lcd.print("Acesso Negado!");
+  delay(2000);
+  mostrarMensagemPadrao();
+}
+
+void mostrarMensagemPadrao() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Aproxime o cartao");
+  lcd.setCursor(2, 1);
+  lcd.print("ou a tag...");
 }
 
 
