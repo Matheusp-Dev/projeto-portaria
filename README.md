@@ -29,6 +29,8 @@ Projeto portaria para faculdade, data de entrega 18/11
       > Vai estar integrado ao interruptor
   > Quando o interruptor for High ele liga o rele
 
+  DONE
+
 - Entrada para os moradores
   - Modulo RFID
       > Cartão e uma tag
