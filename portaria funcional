@@ -3,8 +3,21 @@
 #include <SPI.h>                  
 #include <MFRC522.h>              
 #include <ESP32Servo.h>
+#include <rc-switch.h>
 
 // Definição de variáveis
+
+//Entrada Carros
+const unsigned long CODIGO_BOTAO_A = 123456; 
+const unsigned long CODIGO_BOTAO_B = 789012; 
+
+const int PINO_SERVO_ENTRADA = 13; 
+const int PINO_SERVO_SAIDA = 32; 
+const int PINO_RECEPTOR_RF = 27;
+
+Servo servoEntrada;
+Servo servoSaida;
+RCSwitch mySwitch = RCSwitch();
 
 //Entrada de moradores
 #define I2C_SDA_PIN 25
@@ -83,6 +96,17 @@ void setup(){
 
   	SPI.begin();          
   	mfrc522.PCD_Init();  
+
+	ESP32PWM::allocateTimer(0);
+  	ESP32PWM::allocateTimer(1);
+
+  	servoEntrada.attach(PINO_SERVO_ENTRADA);
+  	servoSaida.attach(PINO_SERVO_SAIDA);
+
+  	servoEntrada.write(ANGULO_PORTA_FECHADA);
+  	servoSaida.write(ANGULO_PORTA_FECHADA);
+
+  	mySwitch.enableReceive(digitalPinToInterrupt(PINO_RECEPTOR_RF));
 }
 
 void loop(){
@@ -90,6 +114,7 @@ void loop(){
   	CercaEletrica();
 	SensorDeVaga();
 	AcessoMoradores();
+	EntradaSaidaCarro()
 }
 
 void gerenciarLuzes(){
@@ -97,7 +122,6 @@ void gerenciarLuzes(){
   Serial.print("Captacao de Luminosidade:" );
   Serial.println(valorLDR);
   delay(500);
-  
   
   if(valorLDR > 900) {
   	digitalWrite(led, HIGH);
@@ -234,6 +258,30 @@ void mostrarMensagemPadrao() {
   lcd.print("Aproxime o cartao");
   lcd.setCursor(2, 1);
   lcd.print("ou a tag...");
+}
+
+void EntradaSaidaCarro() {
+  if (mySwitch.available()) {
+    
+    unsigned long codigoRecebido = mySwitch.getReceivedValue();
+    Serial.print("Código recebido: ");
+    Serial.println(codigoRecebido);
+
+    if (codigoRecebido == CODIGO_BOTAO_A) {
+      Serial.println("Acionando Cancela de ENTRADA...");
+      servoEntrada.write(ANGULO_PORTA_ABERTA); 
+      delay(TEMPO_PORTA_ABERTA);     
+      servoEntrada.write(ANGULO_PORTA_FECHADA);  
+    }
+    else if (codigoRecebido == CODIGO_BOTAO_B) {
+      Serial.println("Acionando Cancela de SAÍDA...");
+      servoSaida.write(ANGULO_PORTA_ABERTA);   
+      delay(TEMPO_PORTA_ABERTA);   
+      servoSaida.write(ANGULO_PORTA_FECHADA); 
+    }
+
+    mySwitch.resetAvailable();
+  }
 }
 
 
