@@ -53,3 +53,4 @@ Projeto portaria para faculdade, data de entrega 18/11
       > B representa a saida(Servo 2)
   - 2 servo motores
       > Abre e fecha num periodo de 2s
+   DONE
