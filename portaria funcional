@@ -15,14 +15,14 @@ void setup(){
 void loop(){
   	Serial.begin(9600);
 	gerenciarLuzes();
-  	Interruptor();
+  	CercaEletrica();
 }
 
 void gerenciarLuzes(){
   int valorLDR = analogRead(ldr);
   Serial.print("Captacao de Luminosidade:" );
   Serial.println(valorLDR);
-  delay(100);
+  delay(500);
   
   
   if(valorLDR > 900) {
@@ -32,7 +32,7 @@ void gerenciarLuzes(){
   }
 }
 
-void Interruptor(){
+void CercaEletrica(){
   int valorINT = digitalRead(interruptor);
   Serial.print("Estado Interruptor:" );
   delay(500);
