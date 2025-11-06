@@ -22,6 +22,8 @@ Projeto portaria para faculdade, data de entrega 18/11
       > Os sinal vem da mesma porta
       > Led verde com a porta not que inverte a porta
 
+   DONE
+
 - Cerca eletrica
   - 1 interruptor
       > Tem que estar em Pull Up
