@@ -42,7 +42,8 @@ Projeto portaria para faculdade, data de entrega 18/11
       > A porta abre espera 2s e fecha
   - Display LCD
       > Toda vez que a porta abrir o display diz:"Bem vindo!"
-   DONE
+
+     DONE
       
 - Entrada para os carros
   - Modulo de radio
