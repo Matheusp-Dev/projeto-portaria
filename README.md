@@ -8,7 +8,7 @@ Projeto portaria para faculdade, data de entrega 18/11
       > Todos são ligados em paralelo
       > Sensor de luminosidade a capitação for <X Todos os leds acendem
 
-      DONE
+   DONE
 
 - Sensor de estacionamento
   - 3 modulos infravermelhos
