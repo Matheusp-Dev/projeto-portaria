@@ -3,7 +3,7 @@
 #include <SPI.h>                  
 #include <MFRC522.h>              
 #include <ESP32Servo.h>
-#include <rc-switch.h>
+#include <RCSwitch.h>
 
 // Definição de variáveis
 
@@ -114,7 +114,7 @@ void loop(){
   	CercaEletrica();
 	SensorDeVaga();
 	AcessoMoradores();
-	EntradaSaidaCarro()
+	EntradaSaidaCarro();
 }
 
 void gerenciarLuzes(){
