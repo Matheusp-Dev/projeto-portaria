@@ -1,21 +1,49 @@
 // Definição de variáveis
-const int led = 13;
-const int ldr = A0;
-int interruptor = 7;
-int relay = 8;
 
+//Pinos para a iluminação da Portaria
+const int led = 15;
+const int ldr = 34;
+
+//Pinos para acionamento da cerca eletrica
+int interruptor = 16;
+int relay = 33;
+
+//Pinos para detecção de vaga ocupada ou disponível
+const int SensorVaga1 = 35;
+const int SensorVaga2 = 36;
+const int SensorVaga3 = 39;
+const int LedVaga1 = 18;
+const int LedVaga2 = 19;
+const int LedVaga3 = 21;
+
+const int NIVEL_OCUPADO = LOW; 
+
+void inicializarLeds() {
+  digitalWrite(LedVaga1, LOW);
+  digitalWrite(LedVaga2, LOW);
+  digitalWrite(LedVaga3, LOW);
+}
 
 void setup(){
- 	pinMode(led, OUTPUT);
-  	pinMode(ldr, INPUT);
-  	pinMode(interruptor, INPUT_PULLUP);
-  	pinMode(relay, OUTPUT);
+	Serial.begin(115200);
+	pinMode(led, OUTPUT);
+	pinMode(ldr, INPUT);
+	pinMode(interruptor, INPUT_PULLUP);
+	pinMode(relay, OUTPUT);
+
+	pinMode(SensorVaga1, INPUT);
+	pinMode(SensorVaga2, INPUT);
+	pinMode(SensorVaga3, INPUT);
+	pinMode(LedVaga1, OUTPUT);
+	pinMode(LedVaga2, OUTPUT);
+	pinMode(LedVaga3, OUTPUT);
+	inicializarLeds();
 }
 
 void loop(){
-  	Serial.begin(9600);
 	gerenciarLuzes();
   	CercaEletrica();
+	SensorDeVaga();
 }
 
 void gerenciarLuzes(){
@@ -41,10 +69,43 @@ void CercaEletrica(){
     digitalWrite(relay, HIGH);
     Serial.println("HIGH");
     delay(500);
-  }
-    else{
+  } else{
       digitalWrite(relay, LOW);
       Serial.println("LOW");
       delay(500);
     }
+}
+
+void SensorDeVaga() {
+  int estadoVaga1 = digitalRead(SensorVaga1);
+
+   if (estadoVaga1 == NIVEL_OCUPADO) {
+    digitalWrite(LedVaga1, HIGH); 
+    Serial.println("Vaga 1: OCUPADA");
+  } else {
+    digitalWrite(LedVaga1, LOW); 
+    Serial.println("Vaga 1: Livre");
   }
+  int estadoVaga2 = digitalRead(SensorVaga2);
+  
+  if (estadoVaga2 == NIVEL_OCUPADO) {
+    digitalWrite(LedVaga2, HIGH); 
+    Serial.println("Vaga 2: OCUPADA");
+  } else {
+    digitalWrite(LedVaga2, LOW); 
+    Serial.println("Vaga 2: Livre");
+  }
+  int estadoVaga3 = digitalRead(SensorVaga3);
+  
+  if (estadoVaga3 == NIVEL_OCUPADO) {
+    digitalWrite(LedVaga3, HIGH); 
+    Serial.println("Vaga 3: OCUPADA");
+  } else {
+    digitalWrite(LedVaga3, LOW);  
+    Serial.println("Vaga 3: Livre");
+  }
+
+  delay(250);
+}
+
+
