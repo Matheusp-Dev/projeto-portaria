@@ -43,7 +43,6 @@ struct Morador {
 };
 
 Morador moradores[NUMERO_MORADORES] = {
-  {"EE FF 00 11", "Maria"},
   {"D3 16 EC 2C", "Mestra"},
   {"43 66 41 02", "Kelwin"},
   {"6A 5B A3 B6", "Kelwin FMU"},
