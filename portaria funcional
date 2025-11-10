@@ -8,8 +8,8 @@
 // Definição de variáveis
 
 //Entrada Carros
-const unsigned long CODIGO_BOTAO_A = 123456; 
-const unsigned long CODIGO_BOTAO_B = 789012; 
+const unsigned long CODIGO_BOTAO_A = 16736113; 
+const unsigned long CODIGO_BOTAO_B = 543908; 
 
 const int PINO_SERVO_ENTRADA = 13; 
 const int PINO_SERVO_SAIDA = 32; 
@@ -36,15 +36,18 @@ Servo portaServo;
 bool portaEstaAberta = false;
 
 
-const int NUMERO_MORADORES = 2;
+const int NUMERO_MORADORES = 6;
 struct Morador {
   String uid;
   String nome;
 };
 
 Morador moradores[NUMERO_MORADORES] = {
-  {"AA BB CC DD", "Kelwin"},
-  {"EE FF 00 11", "Maria"} 
+  {"EE FF 00 11", "Maria"},
+  {"D3 16 EC 2C", "Mestra"},
+  {"43 66 41 02", "Kelwin"},
+  {"6A 5B A3 B6", "Kelwin FMU"},
+  {"CF 79 49 B0", "Kelwin BU"}
 };
 
 //Pinos para a iluminação da Portaria
@@ -52,8 +55,8 @@ const int led = 15;
 const int ldr = 34;
 
 //Pinos para acionamento da cerca eletrica
-int interruptor = 16;
-int relay = 33;
+const int interruptor = 16;
+const int relay = 33;
 
 //Pinos para detecção de vaga ocupada ou disponível
 const int SensorVaga1 = 35;
@@ -111,7 +114,7 @@ void setup(){
 
 void loop(){
 	gerenciarLuzes();
-  	CercaEletrica();
+  CercaEletrica();
 	SensorDeVaga();
 	AcessoMoradores();
 	EntradaSaidaCarro();
@@ -137,12 +140,10 @@ void CercaEletrica(){
   
   if(valorINT == HIGH){
     digitalWrite(relay, HIGH);
-    Serial.println("HIGH");
-    delay(500);
+    Serial.println("LOW");
   } else{
       digitalWrite(relay, LOW);
-      Serial.println("LOW");
-      delay(500);
+      Serial.println("HIGH");
     }
 }
 
@@ -255,7 +256,7 @@ void mostrarAcessoNegado() {
 void mostrarMensagemPadrao() {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Aproxime o cartao");
+  lcd.print("Aprox. o cartao");
   lcd.setCursor(2, 1);
   lcd.print("ou a tag...");
 }
@@ -283,5 +284,3 @@ void EntradaSaidaCarro() {
     mySwitch.resetAvailable();
   }
 }
-
-
