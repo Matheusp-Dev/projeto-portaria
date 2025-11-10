@@ -62,9 +62,9 @@ const int relay = 33;
 const int SensorVaga1 = 35;
 const int SensorVaga2 = 36;
 const int SensorVaga3 = 39;
-const int LedVaga1 = 18;
-const int LedVaga2 = 19;
-const int LedVaga3 = 21;
+const int LedVaga1 = 2;
+const int LedVaga2 = 12;
+const int LedVaga3 = 17;
 
 const int NIVEL_OCUPADO = LOW; 
 
