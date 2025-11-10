@@ -43,7 +43,7 @@ Projeto portaria para faculdade, data de entrega 18/11
   - Display LCD
       > Toda vez que a porta abrir o display diz:"Bem vindo!"
 
-     DONE
+   DONE
       
 - Entrada para os carros
   - Modulo de radio
