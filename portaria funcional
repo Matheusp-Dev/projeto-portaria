@@ -1,358 +1,384 @@
-#include <Wire.h>                 
-#include <LiquidCrystal_I2C.h>    
-#include <SPI.h>                  
-#include <MFRC522.h>              
-#include <ESP32Servo.h>
-#include <RCSwitch.h>
+#include <Wire.h>                  // Biblioteca para comunicação I2C (usada para o LCD)
+#include <LiquidCrystal_I2C.h>    // Biblioteca para o display LCD 16x2 com interface I2C
+#include <SPI.h>                  // Biblioteca para comunicação SPI (usada para o módulo RFID MFRC522)
+#include <MFRC522.h>              // Biblioteca para o leitor RFID/NFC MFRC522
+#include <ESP32Servo.h>           // Biblioteca para controle de Servos no ESP32
+#include <RCSwitch.h>             // Biblioteca para recepção de códigos RF 433MHz (controles de carro)
 
 // ============ COMUNICAÇÃO COM ESP32 MESTRE ============
-#define SERIAL_MESTRE Serial2  // TX2=17, RX2=16
-#define SERIAL_BAUD 115200
+#define SERIAL_MESTRE Serial2  // Define a porta serial 2 do ESP32 para comunicação com o mestre
+#define SERIAL_BAUD 115200     // Define a taxa de transmissão (baud rate)
 
 // Função para enviar eventos ao ESP32 mestre
 void enviarEvento(String mensagem) {
-  SERIAL_MESTRE.println(mensagem);
-  SERIAL_MESTRE.flush();
-  Serial.println("[ENVIADO] " + mensagem);  // Log no Serial Monitor
+  SERIAL_MESTRE.println(mensagem);  // Envia a mensagem pela Serial 2
+  SERIAL_MESTRE.flush();            // Garante que todos os dados sejam enviados
+  Serial.println("[ENVIADO] " + mensagem);  // Loga o evento no Serial Monitor (para debug)
 }
 
 // Definição de variáveis
 
-//Entrada Carros
-const unsigned long CODIGO_BOTAO_A = 16736113; 
-const unsigned long CODIGO_BOTAO_B = 543908; 
+// Entrada Carros
+const unsigned long CODIGO_BOTAO_A = 16736113;  // Código RF esperado para o botão de ENTRADA
+const unsigned long CODIGO_BOTAO_B = 543908;    // Código RF esperado para o botão de SAÍDA
 
-const int PINO_SERVO_ENTRADA = 13; 
-const int PINO_SERVO_SAIDA = 32; 
-const int PINO_RECEPTOR_RF = 27;
+const int PINO_SERVO_ENTRADA = 13;  // Pino do servo da cancela de entrada
+const int PINO_SERVO_SAIDA = 32;    // Pino do servo da cancela de saída
+const int PINO_RECEPTOR_RF = 27;    // Pino de dados do receptor RF 433MHz
 
-Servo servoEntrada;
-Servo servoSaida;
-RCSwitch mySwitch = RCSwitch();
+Servo servoEntrada;  // Objeto para controle do servo de entrada
+Servo servoSaida;    // Objeto para controle do servo de saída
+RCSwitch mySwitch = RCSwitch(); // Objeto para manipular a comunicação RF
 
-//Entrada de moradores
-#define I2C_SDA_PIN 25
-#define I2C_SCL_PIN 26
-LiquidCrystal_I2C lcd(0x27, 16, 2); 
+// Entrada de moradores
+#define I2C_SDA_PIN 25  // Pino SDA para comunicação I2C do LCD
+#define I2C_SCL_PIN 26  // Pino SCL para comunicação I2C do LCD
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Cria o objeto LCD (endereço I2C 0x27, 16 colunas, 2 linhas)
 
-#define SS_PIN    5  
-#define RST_PIN   4 
-MFRC522 mfrc522(SS_PIN, RST_PIN); 
+#define SS_PIN    5  // Pino Chip Select (ou Slave Select) do MFRC522 (SDA/SS)
+#define RST_PIN   4  // Pino de Reset do MFRC522 (RST)
+MFRC522 mfrc522(SS_PIN, RST_PIN); // Cria o objeto para o módulo RFID
 
-#define SERVO_PIN 14 
-#define ANGULO_PORTA_FECHADA 0
-#define ANGULO_PORTA_ABERTA 90
-#define TEMPO_PORTA_ABERTA 3000 
-Servo portaServo;
-bool portaEstaAberta = false;
+#define SERVO_PIN 14               // Pino do servo da porta de pedestres
+#define ANGULO_PORTA_FECHADA 0     // Ângulo para manter a porta de pedestres fechada
+#define ANGULO_PORTA_ABERTA 90     // Ângulo para abrir a porta de pedestres
+#define TEMPO_PORTA_ABERTA 3000    // Tempo em ms que a porta fica aberta após o acesso
+Servo portaServo;                 // Objeto para controle do servo da porta de pedestres
+bool portaEstaAberta = false;      // Flag para indicar se a porta está aberta
 
-
-const int NUMERO_MORADORES = 6;
-struct Morador {
-  String uid;
-  String nome;
+const int NUMERO_MORADORES = 6;  // Tamanho total do array de moradores
+struct Morador {                // Estrutura para armazenar o UID do cartão e o nome
+  String uid;
+  String nome;
 };
 
-Morador moradores[NUMERO_MORADORES] = {
-  {"D3 16 EC 2C", "Mestra"},
-  {"43 66 41 02", "Kelwin"},
-  {"6A 5B A3 B6", "Kelwin FMU"},
-  {"CF 79 49 B0", "Kelwin BU"}
+Morador moradores[NUMERO_MORADORES] = { // Lista de moradores autorizados (UIDs e Nomes)
+  {"D3 16 EC 2C", "Mestra"},
+  {"43 66 41 02", "Kelwin"},
+  {"6A 5B A3 B6", "Kelwin FMU"},
+  {"CF 79 49 B0", "Kelwin BU"}
 };
 
-//Pinos para a iluminação da Portaria
-const int led = 15;
-const int ldr = 34;
+// Pinos para a iluminação da Portaria
+const int led = 15;  // Pino do LED de iluminação 
+const int ldr = 34;  // Pino para o LDR (sensor de luminosidade)
 
-//Pinos para acionamento da cerca eletrica
-const int interruptor = 16;
-const int relay = 33;
+// Pinos para acionamento da cerca eletrica
+const int interruptor = 16; // Pino do interruptor 
+const int relay = 33;      // Pino para acionar o relé da cerca elétrica 
 
-//Pinos para detecção de vaga ocupada ou disponível
-const int SensorVaga1 = 35;
-const int SensorVaga2 = 36;
-const int SensorVaga3 = 39;
-const int LedVaga1 = 2;
-const int LedVaga2 = 12;
-const int LedVaga3 = 17;
+// Pinos para detecção de vaga ocupada ou disponível
+const int SensorVaga1 = 35; // Pino do sensor da Vaga 1
+const int SensorVaga2 = 36; // Pino do sensor da Vaga 2
+const int SensorVaga3 = 39; // Pino do sensor da Vaga 3
+const int LedVaga1 = 2;    // Pino do LED indicador da Vaga 1
+const int LedVaga2 = 12;    // Pino do LED indicador da Vaga 2
+const int LedVaga3 = 17;    // Pino do LED indicador da Vaga 3 
 
-const int NIVEL_OCUPADO = LOW; 
+const int NIVEL_OCUPADO = LOW; // Define o nível lógico que indica que a vaga está ocupada
 
+// Função para garantir que os LEDs de vaga comecem desligados
 void inicializarLeds() {
-  digitalWrite(LedVaga1, LOW);
-  digitalWrite(LedVaga2, LOW);
-  digitalWrite(LedVaga3, LOW);
+  digitalWrite(LedVaga1, LOW);
+  digitalWrite(LedVaga2, LOW);
+  digitalWrite(LedVaga3, LOW);
 }
 
 void setup(){
-	Serial.begin(115200);
-	SERIAL_MESTRE.begin(SERIAL_BAUD, SERIAL_8N1, 16, 17); // RX2=16, TX2=17
-	
-	pinMode(led, OUTPUT);
-	pinMode(ldr, INPUT);
-	pinMode(interruptor, INPUT_PULLUP);
-	pinMode(relay, OUTPUT);
+  Serial.begin(115200); // Inicia a Serial principal (para debug/monitor)
+  SERIAL_MESTRE.begin(SERIAL_BAUD, SERIAL_8N1, 16, 17); // Inicia a Serial 2 (comunicação mestre/escravo)
+  
+  // Configuração dos pinos de iluminação, cerca elétrica e relé
+  pinMode(led, OUTPUT);
+  pinMode(ldr, INPUT); 
+  pinMode(interruptor, INPUT_PULLUP); // Entrada com pull-up interno (liga HIGH, desliga LOW)
+  pinMode(relay, OUTPUT);
 
-	pinMode(SensorVaga1, INPUT);
-	pinMode(SensorVaga2, INPUT);
-	pinMode(SensorVaga3, INPUT);
-	pinMode(LedVaga1, OUTPUT);
-	pinMode(LedVaga2, OUTPUT);
-	pinMode(LedVaga3, OUTPUT);
-	inicializarLeds();
+  // Configuração dos pinos dos sensores e LEDs de vaga
+  pinMode(SensorVaga1, INPUT);
+  pinMode(SensorVaga2, INPUT);
+  pinMode(SensorVaga3, INPUT);
+  pinMode(LedVaga1, OUTPUT);
+  pinMode(LedVaga2, OUTPUT);
+  pinMode(LedVaga3, OUTPUT);
+  inicializarLeds();
 
-  	Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-	lcd.init();
-  	lcd.backlight();
-  	mostrarMensagemPadrao();
+  // Configuração do LCD I2C
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN); // Inicia a comunicação I2C com os pinos definidos
+  lcd.init();
+  lcd.backlight();
+  mostrarMensagemPadrao(); // Exibe a mensagem inicial
 
-  	portaServo.attach(SERVO_PIN);
-  	portaServo.write(90); 
+  // Configuração do servo da porta de pedestres
+  portaServo.attach(SERVO_PIN);
+  portaServo.write(90); // Posição inicial 
 
-  	SPI.begin();          
-  	mfrc522.PCD_Init();  
+  // Configuração do módulo RFID MFRC522
+  SPI.begin();            // Inicia a comunicação SPI
+  mfrc522.PCD_Init();    // Inicializa o MFRC522
 
-	ESP32PWM::allocateTimer(0);
-  	ESP32PWM::allocateTimer(1);
+  // Configuração para Servos no ESP32
+  ESP32PWM::allocateTimer(0); // Aloca timers PWM para os servos
+  ESP32PWM::allocateTimer(1);
 
-  	servoEntrada.attach(PINO_SERVO_ENTRADA);
-  	servoSaida.attach(PINO_SERVO_SAIDA);
+  // Configuração dos servos da cancela de carros
+  servoEntrada.attach(PINO_SERVO_ENTRADA);
+  servoSaida.attach(PINO_SERVO_SAIDA);
 
-  	servoEntrada.write(100);
-  	servoSaida.write(90);
+  servoEntrada.write(100); // Posição inicial (fechada)
+  servoSaida.write(90);    // Posição inicial (fechada)
 
-  	mySwitch.enableReceive(digitalPinToInterrupt(PINO_RECEPTOR_RF));
-  	
-  	// Enviar mensagem de inicialização ao mestre
-  	delay(2000);  // Aguardar estabilização
-  	enviarEvento("STATUS:inicializado");
+  // Configuração do receptor RF
+  mySwitch.enableReceive(digitalPinToInterrupt(PINO_RECEPTOR_RF)); // Ativa a escuta RF
+  
+  // Enviar mensagem de inicialização ao mestre
+  delay(2000);  // Aguarda um tempo para estabilização dos componentes
+  enviarEvento("STATUS:inicializado"); // Envia o status de inicialização
 }
 
 void loop(){
-	gerenciarLuzes();
-  CercaEletrica();
-	SensorDeVaga();
-	AcessoMoradores();
-	EntradaSaidaCarro();
+  gerenciarLuzes();      // Chama a função de controle de iluminação
+  CercaEletrica();       // Chama a função de controle da cerca
+  SensorDeVaga();        // Chama a função de monitoramento de vagas
+  AcessoMoradores();     // Chama a função de controle de acesso RFID para pedestres
+  EntradaSaidaCarro();   // Chama a função de controle de acesso RF para carros
 }
 
+// Função para gerenciar o LED de iluminação com base na leitura do LDR
 void gerenciarLuzes(){
-  int valorLDR = analogRead(ldr);
-  static int valorAnterior = 0;
-  static unsigned long ultimaLeitura = 0;
-  
-  // Enviar leitura a cada 2 segundos
-  if (millis() - ultimaLeitura > 2000) {
-    Serial.print("Captacao de Luminosidade:" );
-    Serial.println(valorLDR);
-    
-    // Enviar se mudou significativamente
-    if (abs(valorLDR - valorAnterior) > 50) {
-      bool luzLigada = (valorLDR > 900);
-      enviarEvento("LUZ:" + String(luzLigada ? "ligada" : "desligada") + "," + String(valorLDR));
-      valorAnterior = valorLDR;
-    }
-    
-    ultimaLeitura = millis();
-  }
-  
-  if(valorLDR > 900) {
-  	digitalWrite(led, HIGH);
-  } else {
-  	digitalWrite(led, LOW);
-  }
+  int valorLDR = analogRead(ldr); // Lê o valor analógico do LDR
+  static int valorAnterior = 0;    // Armazena a leitura anterior
+  static unsigned long ultimaLeitura = 0; // Armazena o tempo da última leitura/envio
+  
+  // Envia a leitura ao mestre a cada 2 segundos e atualiza o estado do LED
+  if (millis() - ultimaLeitura > 2000) {
+    Serial.print("Captacao de Luminosidade:" );
+    Serial.println(valorLDR);
+    
+    // Envia o evento apenas se o valor mudou significativamente (evita spam)
+    if (abs(valorLDR - valorAnterior) > 50) {
+      bool luzLigada = (valorLDR > 900); // Condição para acender (alto valor = escuro)
+      enviarEvento("LUZ:" + String(luzLigada ? "ligada" : "desligada") + "," + String(valorLDR));
+      valorAnterior = valorLDR;
+    }
+    
+    ultimaLeitura = millis();
+  }
+  
+  // Acende/apaga o LED fisicamente
+  if(valorLDR > 900) { // Se o valor do LDR for alto (ambiente escuro)
+    digitalWrite(led, HIGH);
+  } else {
+    digitalWrite(led, LOW);
+  }
 }
 
+// Função para controlar a cerca elétrica através do relé
 void CercaEletrica(){
-  int valorINT = digitalRead(interruptor);
-  static int estadoAnterior = -1;
-  Serial.print("Estado Interruptor:" );
-  delay(500);
-  
-  if(valorINT == HIGH){
-    digitalWrite(relay, HIGH);
-    Serial.println("LOW");
-    if (estadoAnterior != HIGH) {
-      enviarEvento("CERCA:ligada");
-      estadoAnterior = HIGH;
-    }
-  } else{
-      digitalWrite(relay, LOW);
-      Serial.println("HIGH");
-      if (estadoAnterior != LOW) {
-        enviarEvento("CERCA:desligada");
-        estadoAnterior = LOW;
-      }
-    }
+  int valorINT = digitalRead(interruptor); // Lê o estado do interruptor
+  static int estadoAnterior = -1;          // Armazena o estado anterior do interruptor
+  Serial.print("Estado Interruptor:" );
+  delay(500); // Pequeno delay de estabilização
+
+  
+  if(valorINT == HIGH){  // Se o interruptor for acionado (HIGH)
+    digitalWrite(relay, HIGH); // Liga o relé
+    Serial.println("LOW");              
+    if (estadoAnterior != HIGH) {
+      enviarEvento("CERCA:ligada");  // Envia evento se o estado mudou
+      estadoAnterior = HIGH;
+    }
+  } else{                // Se o interruptor for desativado (LOW)
+      digitalWrite(relay, LOW);  // Desliga o relé
+      Serial.println("HIGH");             
+      if (estadoAnterior != LOW) {
+        enviarEvento("CERCA:desligada"); // Envia evento se o estado mudou
+        estadoAnterior = LOW;
+      }
+    }
 }
 
+// Função para monitorar os sensores de vaga e acender os LEDs correspondentes
 void SensorDeVaga() {
-  int estadoVaga1 = digitalRead(SensorVaga1);
-  static int estadoAnteriorVaga1 = -1;
+  // Lógica para Vaga 1
+  int estadoVaga1 = digitalRead(SensorVaga1);
+  static int estadoAnteriorVaga1 = -1;
 
-   if (estadoVaga1 == NIVEL_OCUPADO) {
-    digitalWrite(LedVaga1, HIGH); 
-    Serial.println("Vaga 1: OCUPADA");
-    if (estadoAnteriorVaga1 != NIVEL_OCUPADO) {
-      enviarEvento("VAGA:1,ocupada");
-      estadoAnteriorVaga1 = NIVEL_OCUPADO;
-    }
-  } else {
-    digitalWrite(LedVaga1, LOW); 
-    Serial.println("Vaga 1: Livre");
-    if (estadoAnteriorVaga1 != estadoVaga1) {
-      enviarEvento("VAGA:1,livre");
-      estadoAnteriorVaga1 = estadoVaga1;
-    }
-  }
-  
-  int estadoVaga2 = digitalRead(SensorVaga2);
-  static int estadoAnteriorVaga2 = -1;
-  
-  if (estadoVaga2 == NIVEL_OCUPADO) {
-    digitalWrite(LedVaga2, HIGH); 
-    Serial.println("Vaga 2: OCUPADA");
-    if (estadoAnteriorVaga2 != NIVEL_OCUPADO) {
-      enviarEvento("VAGA:2,ocupada");
-      estadoAnteriorVaga2 = NIVEL_OCUPADO;
-    }
-  } else {
-    digitalWrite(LedVaga2, LOW); 
-    Serial.println("Vaga 2: Livre");
-    if (estadoAnteriorVaga2 != estadoVaga2) {
-      enviarEvento("VAGA:2,livre");
-      estadoAnteriorVaga2 = estadoVaga2;
-    }
-  }
-  
-  int estadoVaga3 = digitalRead(SensorVaga3);
-  static int estadoAnteriorVaga3 = -1;
-  
-  if (estadoVaga3 == NIVEL_OCUPADO) {
-    digitalWrite(LedVaga3, HIGH); 
-    Serial.println("Vaga 3: OCUPADA");
-    if (estadoAnteriorVaga3 != NIVEL_OCUPADO) {
-      enviarEvento("VAGA:3,ocupada");
-      estadoAnteriorVaga3 = NIVEL_OCUPADO;
-    }
-  } else {
-    digitalWrite(LedVaga3, LOW);  
-    Serial.println("Vaga 3: Livre");
-    if (estadoAnteriorVaga3 != estadoVaga3) {
-      enviarEvento("VAGA:3,livre");
-      estadoAnteriorVaga3 = estadoVaga3;
-    }
-  }
+   if (estadoVaga1 == NIVEL_OCUPADO) { // Se a vaga 1 estiver ocupada
+    digitalWrite(LedVaga1, HIGH);      // Acende o LED indicador
+    Serial.println("Vaga 1: OCUPADA");
+    if (estadoAnteriorVaga1 != NIVEL_OCUPADO) {
+      enviarEvento("VAGA:1,ocupada");  // Envia evento se o estado mudou
+      estadoAnteriorVaga1 = NIVEL_OCUPADO;
+    }
+  } else {                             // Se a vaga 1 estiver livre
+    digitalWrite(LedVaga1, LOW);       // Apaga o LED indicador
+    Serial.println("Vaga 1: Livre");
+    if (estadoAnteriorVaga1 != estadoVaga1) {
+      enviarEvento("VAGA:1,livre");    // Envia evento se o estado mudou
+      estadoAnteriorVaga1 = estadoVaga1;
+    }
+  }
+  
+  // Lógica similar para Vaga 2
+  int estadoVaga2 = digitalRead(SensorVaga2);
+  static int estadoAnteriorVaga2 = -1;
+  
+  if (estadoVaga2 == NIVEL_OCUPADO) {
+    digitalWrite(LedVaga2, HIGH); 
+    Serial.println("Vaga 2: OCUPADA");
+    if (estadoAnteriorVaga2 != NIVEL_OCUPADO) {
+      enviarEvento("VAGA:2,ocupada");
+      estadoAnteriorVaga2 = NIVEL_OCUPADO;
+    }
+  } else {
+    digitalWrite(LedVaga2, LOW); 
+    Serial.println("Vaga 2: Livre");
+    if (estadoAnteriorVaga2 != estadoVaga2) {
+      enviarEvento("VAGA:2,livre");
+      estadoAnteriorVaga2 = estadoVaga2;
+    }
+  }
+  
+  // Lógica similar para Vaga 3
+  int estadoVaga3 = digitalRead(SensorVaga3);
+  static int estadoAnteriorVaga3 = -1;
+  
+  if (estadoVaga3 == NIVEL_OCUPADO) {
+    digitalWrite(LedVaga3, HIGH); 
+    Serial.println("Vaga 3: OCUPADA");
+    if (estadoAnteriorVaga3 != NIVEL_OCUPADO) {
+      enviarEvento("VAGA:3,ocupada");
+      estadoAnteriorVaga3 = NIVEL_OCUPADO;
+    }
+  } else {
+    digitalWrite(LedVaga3, LOW);  
+    Serial.println("Vaga 3: Livre");
+    if (estadoAnteriorVaga3 != estadoVaga3) {
+      enviarEvento("VAGA:3,livre");
+      estadoAnteriorVaga3 = estadoVaga3;
+    }
+  }
 
-  delay(250);
+  delay(250); // Pequeno delay de estabilização
 }
 
+// Função para controlar o acesso de pedestres via RFID
 void AcessoMoradores() {
-  if (portaEstaAberta) {
-    return;
-  }
+  if (portaEstaAberta) { // Evita novas leituras enquanto a porta estiver abrindo/fechando
+    return;
+  }
 
-  if ( ! mfrc522.PICC_IsNewCardPresent()) {
-    return;
-  }
-  if ( ! mfrc522.PICC_ReadCardSerial()) {
-    return;
-  }
+  // Verifica se um novo cartão está presente e pronto para leitura
+  if ( ! mfrc522.PICC_IsNewCardPresent()) {
+    return;
+  }
+  // Lê o UID do cartão
+  if ( ! mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
 
-  String uidScaneado = "";
-  for (byte i = 0; i < mfrc522.uid.size; i++) {
-    uidScaneado.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
-    uidScaneado.concat(String(mfrc522.uid.uidByte[i], HEX));
-  }
-  uidScaneado.toUpperCase();
-  uidScaneado.trim();
+  String uidScaneado = "";
+  // Converte o array de bytes do UID lido para uma String formatada
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    uidScaneado.concat(String(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " "));
+    uidScaneado.concat(String(mfrc522.uid.uidByte[i], HEX));
+  }
+  uidScaneado.toUpperCase();
+  uidScaneado.trim(); // Remove espaços em branco antes/depois
 
-  Serial.print("UID Scaneado: ");
-  Serial.println(uidScaneado);
+  Serial.print("UID Scaneado: ");
+  Serial.println(uidScaneado);
 
-  String nomeAutorizado = "";
-  bool acessoPermitido = false;
+  String nomeAutorizado = "";
+  bool acessoPermitido = false;
 
-  for (int i = 0; i < NUMERO_MORADORES; i++) {
-    if (uidScaneado == moradores[i].uid) {
-      nomeAutorizado = moradores[i].nome;
-      acessoPermitido = true;
-      break;
-    }
-  }
+  // Compara o UID lido com os UIDs armazenados na lista de moradores
+  for (int i = 0; i < NUMERO_MORADORES; i++) {
+    if (uidScaneado == moradores[i].uid) {
+      nomeAutorizado = moradores[i].nome;
+      acessoPermitido = true;
+      break; // Acesso encontrado, sai do loop
+    }
+  }
 
-  if (acessoPermitido) {
-    Serial.print("Acesso Permitido para: ");
-    Serial.println(nomeAutorizado);
-    enviarEvento("ACESSO:permitido," + nomeAutorizado + "," + uidScaneado);
-    abrirPorta(nomeAutorizado); 
-  } else {
-    Serial.println("Acesso Negado!");
-    enviarEvento("ACESSO:negado," + uidScaneado);
-    mostrarAcessoNegado();
-  }
-  
-  mfrc522.PICC_HaltA();
-  mfrc522.PCD_StopCrypto1();
+  if (acessoPermitido) {
+    Serial.print("Acesso Permitido para: ");
+    Serial.println(nomeAutorizado);
+    enviarEvento("ACESSO:permitido," + nomeAutorizado + "," + uidScaneado);
+    abrirPorta(nomeAutorizado); // Chama a função para abrir a porta
+  } else {
+    Serial.println("Acesso Negado!");
+    enviarEvento("ACESSO:negado," + uidScaneado);
+    mostrarAcessoNegado();       // Exibe mensagem de acesso negado no LCD
+  }
+  
+  mfrc522.PICC_HaltA();        // Coloca o cartão lido em modo 'stop'
+  mfrc522.PCD_StopCrypto1(); // Interrompe a encriptação (se usada)
 }
 
+// Função para acionar o servo da porta de pedestres
 void abrirPorta(String nome) {
-  portaEstaAberta = true; 
+  portaEstaAberta = true;  // Define a flag como true
 
-  lcd.clear();
-  lcd.setCursor(3, 0);
-  lcd.print("Bem vindo!");
-  
-  int padding = (16 - nome.length()) / 2;
-  if (padding < 0) padding = 0;
-  lcd.setCursor(padding, 1);
-  lcd.print(nome);
+  // Exibe mensagem de boas-vindas no LCD
+  lcd.clear();
+  lcd.setCursor(3, 0);
+  lcd.print("Bem vindo!");
+  
+  int padding = (16 - nome.length()) / 2;
+  if (padding < 0) padding = 0;
+  lcd.setCursor(padding, 1);
+  lcd.print(nome);
 
-  portaServo.write(0);
-  delay(TEMPO_PORTA_ABERTA);
-  portaServo.write(90);
-  mostrarMensagemPadrao();
-  portaEstaAberta = false; 
+  portaServo.write(0);                // Move o servo para abrir a porta
+  delay(TEMPO_PORTA_ABERTA);          // Aguarda o tempo em que a porta fica aberta
+  portaServo.write(90);              // Move o servo para fechar a porta
+  mostrarMensagemPadrao();            // Volta a exibir a mensagem de espera
+  portaEstaAberta = false;  // Define a flag como false
 }
 
+// Exibe a mensagem de acesso negado no LCD
 void mostrarAcessoNegado() {
-  lcd.clear();
-  lcd.setCursor(2, 0);
-  lcd.print("Acesso Negado!");
-  delay(2000);
-  mostrarMensagemPadrao();
+  lcd.clear();
+  lcd.setCursor(2, 0);
+  lcd.print("Acesso Negado!");
+  delay(2000); // Aguarda 2 segundos
+  mostrarMensagemPadrao(); // Volta a exibir a mensagem de espera
 }
 
+// Exibe a mensagem padrão de instrução no LCD
 void mostrarMensagemPadrao() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Aprox. o cartao");
-  lcd.setCursor(2, 1);
-  lcd.print("ou a tag...");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Aprox. o cartao");
+  lcd.setCursor(2, 1);
+  lcd.print("ou a tag...");
 }
 
+// Função para controlar a entrada e saída de carros via RF
 void EntradaSaidaCarro() {
-  if (mySwitch.available()) {
-    
-    unsigned long codigoRecebido = mySwitch.getReceivedValue();
-    Serial.print("Código recebido: ");
-    Serial.println(codigoRecebido);
+  if (mySwitch.available()) { // Verifica se um código RF foi recebido
+    
+    unsigned long codigoRecebido = mySwitch.getReceivedValue(); // Obtém o código
+    Serial.print("Código recebido: ");
+    Serial.println(codigoRecebido);
 
-    if (codigoRecebido == CODIGO_BOTAO_A) {
-      Serial.println("Acionando Cancela de ENTRADA...");
-      enviarEvento("CANCELA:entrada," + String(codigoRecebido));
-      servoEntrada.write(220); 
-      delay(TEMPO_PORTA_ABERTA);     
-      servoEntrada.write(98);  
-    }
-    else if (codigoRecebido == CODIGO_BOTAO_B) {
-      Serial.println("Acionando Cancela de SAÍDA...");
-      enviarEvento("CANCELA:saida," + String(codigoRecebido));
-      servoSaida.write(0);   
-      delay(TEMPO_PORTA_ABERTA);   
-      servoSaida.write(95); 
-    }
+    if (codigoRecebido == CODIGO_BOTAO_A) { // Verifica se é o código de ENTRADA
+      Serial.println("Acionando Cancela de ENTRADA...");
+      enviarEvento("CANCELA:entrada," + String(codigoRecebido));
+      servoEntrada.write(220);                 // Abre a cancela de entrada
+      delay(TEMPO_PORTA_ABERTA);              // Aguarda o tempo aberta
+      servoEntrada.write(98);                  // Fecha a cancela de entrada
+    }
+    else if (codigoRecebido == CODIGO_BOTAO_B) { // Verifica se é o código de SAÍDA
+      Serial.println("Acionando Cancela de SAÍDA...");
+      enviarEvento("CANCELA:saida," + String(codigoRecebido));
+      servoSaida.write(0);                     // Abre a cancela de saída
+      delay(TEMPO_PORTA_ABERTA);              // Aguarda o tempo aberta
+      servoSaida.write(95);                    // Fecha a cancela de saída
+    }
 
-    mySwitch.resetAvailable();
-  }
+    mySwitch.resetAvailable(); // Reseta o estado para receber um novo código
+  }
 }
