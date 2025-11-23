@@ -5,6 +5,17 @@
 #include <ESP32Servo.h>
 #include <RCSwitch.h>
 
+// ============ COMUNICAÇÃO COM ESP32 MESTRE ============
+#define SERIAL_MESTRE Serial2  // TX2=17, RX2=16
+#define SERIAL_BAUD 115200
+
+// Função para enviar eventos ao ESP32 mestre
+void enviarEvento(String mensagem) {
+  SERIAL_MESTRE.println(mensagem);
+  SERIAL_MESTRE.flush();
+  Serial.println("[ENVIADO] " + mensagem);  // Log no Serial Monitor
+}
+
 // Definição de variáveis
 
 //Entrada Carros
@@ -30,8 +41,8 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 #define SERVO_PIN 14 
 #define ANGULO_PORTA_FECHADA 0
-#define ANGULO_PORTA_ABERTA  90
-#define TEMPO_PORTA_ABERTA 4000 
+#define ANGULO_PORTA_ABERTA 90
+#define TEMPO_PORTA_ABERTA 3000 
 Servo portaServo;
 bool portaEstaAberta = false;
 
@@ -75,6 +86,8 @@ void inicializarLeds() {
 
 void setup(){
 	Serial.begin(115200);
+	SERIAL_MESTRE.begin(SERIAL_BAUD, SERIAL_8N1, 16, 17); // RX2=16, TX2=17
+	
 	pinMode(led, OUTPUT);
 	pinMode(ldr, INPUT);
 	pinMode(interruptor, INPUT_PULLUP);
@@ -94,7 +107,7 @@ void setup(){
   	mostrarMensagemPadrao();
 
   	portaServo.attach(SERVO_PIN);
-  	portaServo.write(ANGULO_PORTA_FECHADA); 
+  	portaServo.write(90); 
 
   	SPI.begin();          
   	mfrc522.PCD_Init();  
@@ -105,10 +118,14 @@ void setup(){
   	servoEntrada.attach(PINO_SERVO_ENTRADA);
   	servoSaida.attach(PINO_SERVO_SAIDA);
 
-  	servoEntrada.write(ANGULO_PORTA_FECHADA);
-  	servoSaida.write(ANGULO_PORTA_FECHADA);
+  	servoEntrada.write(100);
+  	servoSaida.write(90);
 
   	mySwitch.enableReceive(digitalPinToInterrupt(PINO_RECEPTOR_RF));
+  	
+  	// Enviar mensagem de inicialização ao mestre
+  	delay(2000);  // Aguardar estabilização
+  	enviarEvento("STATUS:inicializado");
 }
 
 void loop(){
@@ -121,9 +138,23 @@ void loop(){
 
 void gerenciarLuzes(){
   int valorLDR = analogRead(ldr);
-  Serial.print("Captacao de Luminosidade:" );
-  Serial.println(valorLDR);
-  delay(500);
+  static int valorAnterior = 0;
+  static unsigned long ultimaLeitura = 0;
+  
+  // Enviar leitura a cada 2 segundos
+  if (millis() - ultimaLeitura > 2000) {
+    Serial.print("Captacao de Luminosidade:" );
+    Serial.println(valorLDR);
+    
+    // Enviar se mudou significativamente
+    if (abs(valorLDR - valorAnterior) > 50) {
+      bool luzLigada = (valorLDR > 900);
+      enviarEvento("LUZ:" + String(luzLigada ? "ligada" : "desligada") + "," + String(valorLDR));
+      valorAnterior = valorLDR;
+    }
+    
+    ultimaLeitura = millis();
+  }
   
   if(valorLDR > 900) {
   	digitalWrite(led, HIGH);
@@ -134,45 +165,83 @@ void gerenciarLuzes(){
 
 void CercaEletrica(){
   int valorINT = digitalRead(interruptor);
+  static int estadoAnterior = -1;
   Serial.print("Estado Interruptor:" );
   delay(500);
   
   if(valorINT == HIGH){
     digitalWrite(relay, HIGH);
     Serial.println("LOW");
+    if (estadoAnterior != HIGH) {
+      enviarEvento("CERCA:ligada");
+      estadoAnterior = HIGH;
+    }
   } else{
       digitalWrite(relay, LOW);
       Serial.println("HIGH");
+      if (estadoAnterior != LOW) {
+        enviarEvento("CERCA:desligada");
+        estadoAnterior = LOW;
+      }
     }
 }
 
 void SensorDeVaga() {
   int estadoVaga1 = digitalRead(SensorVaga1);
+  static int estadoAnteriorVaga1 = -1;
 
    if (estadoVaga1 == NIVEL_OCUPADO) {
     digitalWrite(LedVaga1, HIGH); 
     Serial.println("Vaga 1: OCUPADA");
+    if (estadoAnteriorVaga1 != NIVEL_OCUPADO) {
+      enviarEvento("VAGA:1,ocupada");
+      estadoAnteriorVaga1 = NIVEL_OCUPADO;
+    }
   } else {
     digitalWrite(LedVaga1, LOW); 
     Serial.println("Vaga 1: Livre");
+    if (estadoAnteriorVaga1 != estadoVaga1) {
+      enviarEvento("VAGA:1,livre");
+      estadoAnteriorVaga1 = estadoVaga1;
+    }
   }
+  
   int estadoVaga2 = digitalRead(SensorVaga2);
+  static int estadoAnteriorVaga2 = -1;
   
   if (estadoVaga2 == NIVEL_OCUPADO) {
     digitalWrite(LedVaga2, HIGH); 
     Serial.println("Vaga 2: OCUPADA");
+    if (estadoAnteriorVaga2 != NIVEL_OCUPADO) {
+      enviarEvento("VAGA:2,ocupada");
+      estadoAnteriorVaga2 = NIVEL_OCUPADO;
+    }
   } else {
     digitalWrite(LedVaga2, LOW); 
     Serial.println("Vaga 2: Livre");
+    if (estadoAnteriorVaga2 != estadoVaga2) {
+      enviarEvento("VAGA:2,livre");
+      estadoAnteriorVaga2 = estadoVaga2;
+    }
   }
+  
   int estadoVaga3 = digitalRead(SensorVaga3);
+  static int estadoAnteriorVaga3 = -1;
   
   if (estadoVaga3 == NIVEL_OCUPADO) {
     digitalWrite(LedVaga3, HIGH); 
     Serial.println("Vaga 3: OCUPADA");
+    if (estadoAnteriorVaga3 != NIVEL_OCUPADO) {
+      enviarEvento("VAGA:3,ocupada");
+      estadoAnteriorVaga3 = NIVEL_OCUPADO;
+    }
   } else {
     digitalWrite(LedVaga3, LOW);  
     Serial.println("Vaga 3: Livre");
+    if (estadoAnteriorVaga3 != estadoVaga3) {
+      enviarEvento("VAGA:3,livre");
+      estadoAnteriorVaga3 = estadoVaga3;
+    }
   }
 
   delay(250);
@@ -215,9 +284,11 @@ void AcessoMoradores() {
   if (acessoPermitido) {
     Serial.print("Acesso Permitido para: ");
     Serial.println(nomeAutorizado);
+    enviarEvento("ACESSO:permitido," + nomeAutorizado + "," + uidScaneado);
     abrirPorta(nomeAutorizado); 
   } else {
     Serial.println("Acesso Negado!");
+    enviarEvento("ACESSO:negado," + uidScaneado);
     mostrarAcessoNegado();
   }
   
@@ -237,9 +308,9 @@ void abrirPorta(String nome) {
   lcd.setCursor(padding, 1);
   lcd.print(nome);
 
-  portaServo.write(ANGULO_PORTA_ABERTA);
+  portaServo.write(0);
   delay(TEMPO_PORTA_ABERTA);
-  portaServo.write(ANGULO_PORTA_FECHADA);
+  portaServo.write(90);
   mostrarMensagemPadrao();
   portaEstaAberta = false; 
 }
@@ -269,15 +340,17 @@ void EntradaSaidaCarro() {
 
     if (codigoRecebido == CODIGO_BOTAO_A) {
       Serial.println("Acionando Cancela de ENTRADA...");
-      servoEntrada.write(ANGULO_PORTA_ABERTA); 
+      enviarEvento("CANCELA:entrada," + String(codigoRecebido));
+      servoEntrada.write(220); 
       delay(TEMPO_PORTA_ABERTA);     
-      servoEntrada.write(ANGULO_PORTA_FECHADA);  
+      servoEntrada.write(98);  
     }
     else if (codigoRecebido == CODIGO_BOTAO_B) {
       Serial.println("Acionando Cancela de SAÍDA...");
-      servoSaida.write(ANGULO_PORTA_ABERTA);   
+      enviarEvento("CANCELA:saida," + String(codigoRecebido));
+      servoSaida.write(0);   
       delay(TEMPO_PORTA_ABERTA);   
-      servoSaida.write(ANGULO_PORTA_FECHADA); 
+      servoSaida.write(95); 
     }
 
     mySwitch.resetAvailable();
